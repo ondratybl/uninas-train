@@ -31,6 +31,8 @@ import torch.nn as nn
 import torchvision.utils
 import yaml
 
+from uninas import UNIModel, UNIModelCfg
+
 from timm import utils
 from timm.data import create_dataset, create_loader, create_naflex_loader, resolve_data_config, \
     Mixup, FastCollateMixup, AugMixDataset
@@ -106,8 +108,9 @@ group.add_argument('--dataset-trust-remote-code', action='store_true', default=F
 
 # Model parameters
 group = parser.add_argument_group('Model parameters')
-group.add_argument('--model', default='resnet50', type=str, metavar='MODEL',
-                   help='Name of model to train (default: "resnet50")')
+group.add_argument('--model_path', default='model_strings/model_string.json', type=str, metavar='MODEL_PATH',
+                   help='Path to uninas model string.')
+group.add_argument('--params_budget', default=33000000, type=int, help='Maximum possible param count (search space boundary).')
 group.add_argument('--pretrained', action='store_true', default=False,
                    help='Start with pretrained version of specified network (if avail)')
 group.add_argument('--pretrained-path', default=None, type=str,
@@ -510,22 +513,20 @@ def main():
             num_classes=-1,  # force head adaptation
         )
 
-    model = create_model(
-        args.model,
-        pretrained=args.pretrained,
-        in_chans=in_chans,
-        num_classes=args.num_classes,
-        drop_rate=args.drop,
-        drop_path_rate=args.drop_path,
-        drop_block_rate=args.drop_block,
-        global_pool=args.gp,
-        bn_momentum=args.bn_momentum,
-        bn_eps=args.bn_eps,
-        scriptable=args.torchscript,
-        checkpoint_path=args.initial_checkpoint,
-        **factory_kwargs,
-        **args.model_kwargs,
-    )
+    with open(args.model_path, "r") as f:
+        model_string = f.read()
+    model_cfg = UNIModelCfg.from_string(model_string)
+    assert model_cfg.img_size == 224  # FIXME: make sure competititor knows about these restrictions before he shares model_string
+    assert model_cfg.num_classes == 1000
+    assert model_cfg.drop_rate == 0.
+    assert model_cfg.embed_dim == (96, 192, 384, 768) or model_cfg.embed_dim == [96, 192, 384, 768]
+    assert model_cfg.depths == (2, 3, 5, 2) or model_cfg.depths == [2, 3, 5, 2]
+    assert model_cfg.stem_width == [32, 64] or model_cfg.stem_width == (32, 64)
+
+    model = UNIModel(UNIModelCfg.from_string(model_string)).to(device)
+    if args.params_budget is not None:
+        assert sum(p.numel() for p in model.parameters()) <= args.params_budget, f'Model does not satisfy the #params restriction of {args.params_budget}'
+
     if args.head_init_scale is not None:
         with torch.no_grad():
             model.get_classifier().weight.mul_(args.head_init_scale)
@@ -545,7 +546,7 @@ def main():
 
     if utils.is_primary(args):
         _logger.info(
-            f'Model {safe_model_name(args.model)} created, param count:{sum([m.numel() for m in model.parameters()])}')
+            f'Model from path {safe_model_name(args.model_path)} created, param count:{sum([m.numel() for m in model.parameters()])}')
 
     data_config = resolve_data_config(vars(args), model=model, verbose=utils.is_primary(args))
 
@@ -969,7 +970,7 @@ def main():
         else:
             exp_name = '-'.join([
                 datetime.now().strftime("%Y%m%d-%H%M%S"),
-                safe_model_name(args.model),
+                safe_model_name(args.model_path),
                 str(data_config['input_size'][-1])
             ])
         output_dir = utils.get_outdir(args.output if args.output else './output/train', exp_name)
