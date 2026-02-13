@@ -518,7 +518,7 @@ def main():
     model_cfg = UNIModelCfg.from_string(model_string)
     assert model_cfg.img_size == 224
     assert model_cfg.num_classes == 1000
-    assert model_cfg.drop_rate == 0.
+    #assert model_cfg.drop_rate == 0.
     #assert model_cfg.embed_dim == (96, 192, 384, 768) or model_cfg.embed_dim == [96, 192, 384, 768]
     #assert model_cfg.depths == (2, 3, 5, 2) or model_cfg.depths == [2, 3, 5, 2]
     #assert model_cfg.stem_width == [32, 64] or model_cfg.stem_width == (32, 64)
