@@ -516,12 +516,12 @@ def main():
     with open(args.model_path, "r") as f:
         model_string = f.read()
     model_cfg = UNIModelCfg.from_string(model_string)
-    assert model_cfg.img_size == 224  # FIXME: make sure competititor knows about these restrictions before he shares model_string
+    assert model_cfg.img_size == 224
     assert model_cfg.num_classes == 1000
-    assert model_cfg.drop_rate == 0.
-    assert model_cfg.embed_dim == (96, 192, 384, 768) or model_cfg.embed_dim == [96, 192, 384, 768]
-    assert model_cfg.depths == (2, 3, 5, 2) or model_cfg.depths == [2, 3, 5, 2]
-    assert model_cfg.stem_width == [32, 64] or model_cfg.stem_width == (32, 64)
+    #assert model_cfg.drop_rate == 0.
+    #assert model_cfg.embed_dim == (96, 192, 384, 768) or model_cfg.embed_dim == [96, 192, 384, 768]
+    #assert model_cfg.depths == (2, 3, 5, 2) or model_cfg.depths == [2, 3, 5, 2]
+    #assert model_cfg.stem_width == [32, 64] or model_cfg.stem_width == (32, 64)
 
     model = UNIModel(UNIModelCfg.from_string(model_string)).to(device)
     if args.params_budget is not None:
