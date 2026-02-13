@@ -108,7 +108,7 @@ group.add_argument('--dataset-trust-remote-code', action='store_true', default=F
 
 # Model parameters
 group = parser.add_argument_group('Model parameters')
-group.add_argument('--model_path', default='model_strings/model_string_transformer.json', type=str, metavar='MODEL_PATH',
+group.add_argument('--model_path', default='model_strings/model_string.json', type=str, metavar='MODEL_PATH',
                    help='Path to uninas model string.')
 group.add_argument('--params_budget', default=33000000, type=int, help='Maximum possible param count (search space boundary).')
 group.add_argument('--pretrained', action='store_true', default=False,
