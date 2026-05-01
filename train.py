@@ -109,7 +109,7 @@ group.add_argument('--dataset-trust-remote-code', action='store_true', default=F
 # Model parameters
 group = parser.add_argument_group('Model parameters')
 group.add_argument('--model_path', default='model_strings/model_string.json', type=str, metavar='MODEL_PATH',
-                   help='Path to uninas model string.')
+                   help='Path to uninas model string (.json) or pre-built model (.pkl).')
 group.add_argument('--params_budget', default=33000000, type=int, help='Maximum possible param count (search space boundary).')
 group.add_argument('--pretrained', action='store_true', default=False,
                    help='Start with pretrained version of specified network (if avail)')
@@ -513,17 +513,26 @@ def main():
             num_classes=-1,  # force head adaptation
         )
 
-    with open(args.model_path, "r") as f:
-        model_string = f.read()
-    model_cfg = UNIModelCfg.from_string(model_string)
-    assert model_cfg.img_size == 224
-    assert model_cfg.num_classes == 1000
-    #assert model_cfg.drop_rate == 0.
-    #assert model_cfg.embed_dim == (96, 192, 384, 768) or model_cfg.embed_dim == [96, 192, 384, 768]
-    #assert model_cfg.depths == (2, 3, 5, 2) or model_cfg.depths == [2, 3, 5, 2]
-    #assert model_cfg.stem_width == [32, 64] or model_cfg.stem_width == (32, 64)
+    # --- Model loading: .pkl (pre-built hybrid model) vs .json (UNIModelCfg string) ---
+    if args.model_path.endswith('.pkl'):
+        # .pkl models are pre-built blends of MaxxViT (timm) + UNInas blocks.
+        # Load the full model object directly.
+        _logger.info(f'Loading pre-built model from pickle: {args.model_path}')
+        model = torch.load(args.model_path, map_location='cpu', weights_only=False)
+        model = model.to(device)
+    else:
+        with open(args.model_path, "r") as f:
+            model_string = f.read()
+        model_cfg = UNIModelCfg.from_string(model_string)
+        assert model_cfg.img_size == 224
+        assert model_cfg.num_classes == 1000
+        #assert model_cfg.drop_rate == 0.
+        #assert model_cfg.embed_dim == (96, 192, 384, 768) or model_cfg.embed_dim == [96, 192, 384, 768]
+        #assert model_cfg.depths == (2, 3, 5, 2) or model_cfg.depths == [2, 3, 5, 2]
+        #assert model_cfg.stem_width == [32, 64] or model_cfg.stem_width == (32, 64)
 
-    model = UNIModel(UNIModelCfg.from_string(model_string)).to(device)
+        model = UNIModel(UNIModelCfg.from_string(model_string)).to(device)
+
     if args.params_budget is not None:
         assert sum(p.numel() for p in model.parameters()) <= args.params_budget, f'Model does not satisfy the #params restriction of {args.params_budget}'
 
