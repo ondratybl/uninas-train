@@ -453,6 +453,33 @@ def _parse_args():
     args_text = yaml.safe_dump(args.__dict__, default_flow_style=False)
     return args, args_text
 
+def freeze_unused_params(model):
+    def register_hooks():
+        param_usage = {}
+        for name, param in model.named_parameters():
+            param_usage[name] = False
+            if param.requires_grad:
+                def make_hook(name=name):
+                    return lambda grad: param_usage.__setitem__(name, True)
+                param.register_hook(make_hook(name))
+        return param_usage
+
+    model.train()
+    param_usage = register_hooks()
+    dev = next(model.parameters()).device
+    dummy_input = torch.rand(1, 3, 224, 224, device=dev)
+    output = model(dummy_input)
+    loss = nn.CrossEntropyLoss()(output, torch.zeros(1, dtype=torch.long, device=dev))
+    loss.backward()
+
+    unused_params = [name for name, used in param_usage.items() if not used]
+    _logger.info(f"Freezing {len(unused_params)} unused parameters: {unused_params}")
+
+    for name, param in model.named_parameters():
+        if name in unused_params:
+            param.requires_grad = False
+
+    model.zero_grad(set_to_none=True)
 
 def main():
     utils.setup_default_logging()
@@ -522,6 +549,7 @@ def main():
         with open(args.model_path, 'rb') as f:
             model = pickle.load(f)
         model = model.to(device)
+        freeze_unused_params(model)
     else:
         with open(args.model_path, "r") as f:
             model_string = f.read()
