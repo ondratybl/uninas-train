@@ -518,7 +518,9 @@ def main():
         # .pkl models are pre-built blends of MaxxViT (timm) + UNInas blocks.
         # Load the full model object directly.
         _logger.info(f'Loading pre-built model from pickle: {args.model_path}')
-        model = torch.load(args.model_path, map_location='cpu', weights_only=False)
+        import pickle
+        with open(args.model_path, 'rb') as f:
+            model = pickle.load(f)
         model = model.to(device)
     else:
         with open(args.model_path, "r") as f:
